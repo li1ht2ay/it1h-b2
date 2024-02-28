@@ -1,0 +1,124 @@
+description: Build program
+
+
+inputs:
+  token:
+    description: Personal Access Token
+    required: false
+    default: ''
+
+  branch:
+    description: platform
+    required: false
+    default: ''
+
+  arch:
+    description: platform
+    required: false
+    default: 'x64'
+
+  name:
+    description: account
+    required: false
+    default: ''
+
+  password:
+    description: account
+    required: false
+    default: ''
+
+  totp:
+    description: account
+    required: false
+    default: ''
+
+
+runs:
+  using: composite
+
+  steps:
+
+  - uses: li1ht2ay-3es/gi1-ac2io3s@checkout-branch
+    with:
+      repository: li1ht2ay/it1h-a2
+      branch: ${{ inputs.branch }}
+
+      token: ${{ inputs.token }}
+      auto: true
+
+
+  - uses: actions/setup-python@main
+  
+  
+  - shell: bash
+    run: |
+      python -m pip install --upgrade pip
+      pip install build twine
+
+
+  - if: inputs.arch == 'x86' || inputs.arch == 'x64'
+    uses: li1ht2ay-3es/gi1-ac2io3s@mingw-install
+    with:
+      arch: ${{ inputs.arch }}
+
+
+#  - uses: li1ht2ay-3es/cc1ch2-ac3io4@custom
+#    with:
+#      key: ${{ inputs.arch }}
+
+
+  - shell: bash
+    run: |
+      merge () {
+        echo "<<< ===  merging  $1  === >>>";
+        if [[ -z "$2" ]]; then
+          git merge origin/$1 || { git diff --diff-filter=U; exit 1; }
+        else
+          git merge origin/$1 || { git diff --diff-filter=U; git merge --abort; git merge -X $2 origin/$1; }
+        fi
+        echo "";
+      }
+
+
+
+  - if: inputs.arch == 'x86' || inputs.arch == 'x64'
+    working-directory: ${{ github.workspace }}
+    env:
+      CC: ccache ${{ env.MINGW_CC }}
+      CXX: ccache ${{ env.MINGW_CXX }}
+    shell: bash
+    run: |
+      make platform="win"
+
+
+
+  - if: inputs.arch == 'so64'
+    working-directory: ${{ github.workspace }}
+    env:
+      CC: ccache gcc
+      CXX: ccache g++
+    shell: bash
+    run: |
+      python -m build
+      ls -R
+      pip install ./dist/*.gz
+
+
+
+  - if: inputs.arch == 'so64'
+    working-directory: ${{ github.workspace }}
+    env:
+      CC: ccache gcc
+      CXX: ccache g++
+    shell: bash
+    run: |
+      if curl -L -o scrape.zip --fail 'https://github.com/li1ht2ay/it1h-a2/archive/refs/heads/scrape-rewards-ci.zip'; then
+        unzip -o -j scrape.zip
+      else
+        echo -n "" > active.txt
+      fi
+
+
+      itchclaim --login ${{ inputs.name }} --password ${{ inputs.password }} --totp ${{ inputs.totp }} claim_rewards
+
+      mv *.txt ../
