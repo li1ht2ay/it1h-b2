@@ -39,6 +39,7 @@ class ItchGame:
         self.price: float = None
         self.sales: List[ItchSale] = []
         self.cover_image: str = None
+        self.download_url: str = None
 
     @classmethod
     def from_div(cls, div: Tag, price_needed: bool = False):
@@ -53,7 +54,9 @@ class ItchGame:
         self = ItchGame(id)
         a = div.find('a', class_='title game_link')
         self.name = a.text
-        self.url = a.attrs['href']
+        self.download_url = a.attrs['href']
+        str = self.download_url.find('/download/')
+        self.url = self.download_url[0:str]
 
         try:
             self.cover_image = div.find('div', class_='game_thumb').find('img').attrs['data-lazy_src']
@@ -129,21 +132,25 @@ class ItchGame:
         if url[-1] == '/':
             url = url[:-1]
 
-        r = requests.get(url + '/data.json',
-                        headers={'User-Agent': f'ItchClaim {__version__}'},
-                        timeout=8,)
+        try:
+            r = requests.get(url + '/data.json',
+                            headers={'User-Agent': f'ItchClaim {__version__}'},
+                            timeout=8,)
+        except:
+            mock_game = ItchGame(-1)
+            mock_game.url = url
+            return mock_game
         r.encoding = 'utf-8'
         resp = json.loads(r.text)
-
         if 'errors' in resp:
+            mock_game = ItchGame(-1)
+            mock_game.url = url
             if resp['errors'][0] in ('invalid game', 'invalid user'):
                 # Check if the game's URL has been changed
-                mock_game = ItchGame(-1)
-                mock_game.url = url
                 if mock_game.check_redirect_url():
                     return ItchGame.from_api(mock_game.url)
             print(f'Failed to get game {url} from API: {resp["errors"][0]}')
-            return None
+            return mock_game
 
         game_id = resp['id']
         game = ItchGame(game_id)
@@ -158,14 +165,14 @@ class ItchGame:
         # https://web.archive.org/web/20231107063001/https://polygon-sphere.itch.io/rogue-ai/data.json
         if len(r.history) > 0 and r.history[0].is_redirect:
             game.url = r.history[0].headers['Location'].replace('/data.json', '')
-        game.price = float(resp['price'][1:])
+        # game.price = float(resp['price'][1:])
         game.name = resp['title']
-        game.cover_image = resp['cover_image']
+        # game.cover_image = resp['cover_image']
 
-        if resp['sale'] and resp['sale']['rate'] == 100:
+        # if resp['sale'] and resp['sale']['rate'] == 100:
             # Don't even bother with parsing the end date, because the JSON we have doesn't have the start date of the sale,
             # so ItchSale will update both dates regardless of what data we pass it here.
-            game.sales = [ItchSale(resp['sale']['id'])]
+            # game.sales = [ItchSale(resp['sale']['id'])]
 
         return game
 
@@ -223,12 +230,13 @@ class ItchGame:
             s.get('https://itch.io/')
         csrf_token = urllib.parse.unquote(s.cookies['itchio_token'])
 
-        r = s.post(self.url + '/download_url', json={'csrf_token': csrf_token})
-        r.encoding = 'utf-8'
-        resp = json.loads(r.text)
-        if 'errors' in resp:
-            print(f"ERROR: Failed to get download links for game {self.name} (url: {self.url})")
-            print(f"\t{resp['errors'][0]}")
+        try:
+            r = s.post(self.url + '/download_url', json={'csrf_token': csrf_token})
+            r.encoding = 'utf-8'
+            resp = json.loads(r.text)
+        except:
+            # print(f"ERROR: Failed to get download links for game {self.name} (url: {self.url})")
+            # print(f"\t{resp['errors'][0]}")
             return
         download_page = json.loads(r.text)['url']
         r = s.get(download_page)
@@ -280,7 +288,7 @@ class ItchGame:
             'file_size': div.find('span', class_ = 'file_size').next.text,
             'upload_date': upload_date.timestamp(),
             'platforms': platforms,
-            'url': download_url,
+            'download_url': download_url,
         }
 
     def serialize_min(self):
@@ -291,6 +299,7 @@ class ItchGame:
             'url': self.url,
             'claimable': self.claimable,
             'sales': ItchSale.serialize_list(self.sales),
+            'download_url': self.download_url,
         }
 
     def check_redirect_url(self):
@@ -305,5 +314,5 @@ class ItchGame:
         self.url = resp_redirect.next.url
         if 'claimable' in self.__dict__.keys():
             del self.__dict__['claimable']
-        print(f"WARN: URL of game {self.name} has changed to {self.url}")
+        # print(f"WARN: URL of game {self.name} has changed to {self.url}")
         return True

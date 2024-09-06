@@ -36,8 +36,8 @@ class ItchSale:
         self.start: datetime = start
         self.err: str = None
 
-        if not start or not end:
-            self.get_data_online()
+        # if not start or not end:
+            # self.get_data_online()
 
 
     def get_data_online(self):

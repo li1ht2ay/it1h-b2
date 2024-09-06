@@ -62,11 +62,12 @@ class ItchUser:
 
         errors_div = soup.find('div', class_='form_errors')
         if errors_div:
-            print(f'Error while logging in: ' + errors_div.find('li').text)
-            exit(1)
+            print(f'Error while logging in: ' + errors_div.find('li').text, flush=True)
+            return
+            # exit(1)
 
+        self.user_id = soup.find_all(attrs={"name": "user_id"})[0]['value']
         if r.url.find('totp/') != -1:
-            self.user_id = soup.find_all(attrs={"name": "user_id"})[0]['value']
             if totp is None:
                 totp = input('Enter 2FA code: ')
             
@@ -90,13 +91,16 @@ class ItchUser:
         if errors_div:
             totp_new = pyotp.TOTP(totp_secret).now()
             if totp_secret and totp_new != totp:
-                print(f'TOTP code changed (probably the 30 seconds have elapsed while sending it). Attempting with new code.')
+                print(f'TOTP code changed (probably the 30 seconds have elapsed while sending it). Attempting with new code.', flush=True)
                 return self.send_top(totp_new, r.url)
-            print(f'Error while logging in: ' + errors_div.find('li').text)
-            exit(1)
+            print(f'Error while logging in: ' + errors_div.find('li').text, flush=True)
+            self.username = None
+            return
+            # exit(1)
 
     def save_session(self):
         """Save session to disk"""
+        return
         os.makedirs(ItchUser.get_users_dir(), exist_ok=True)
         data = {
             'csrf_token': self.csrf_token,
@@ -143,16 +147,19 @@ class ItchUser:
         return owned_box != None
 
     def claim_game(self, game: ItchGame):
-        r = self.s.post(game.url + '/download_url', json={'csrf_token': self.csrf_token})
-        r.encoding = 'utf-8'
-        resp = json.loads(r.text)
+        try:
+            r = self.s.post(game.url + '/download_url', json={'csrf_token': self.csrf_token})
+            r.encoding = 'utf-8'
+            resp = json.loads(r.text)
+        except:
+            print(f"ERROR: Failed to check {game.url}", flush=True)
+            return
         if 'errors' in resp:
             if resp['errors'][0] in ('invalid game', 'invalid user'):
                 if game.check_redirect_url():
                     self.claim_game(game)
                     return
-            print(f"ERROR: Failed to claim game {game.name} (url: {game.url})")
-            print(f"\t{resp['errors'][0]}")
+            print(f"ERROR: Failed to claim {game.url}     {resp['errors'][0]}", flush=True)
             return
         download_url = json.loads(r.text)['url']
         r = self.s.get(download_url)
@@ -160,8 +167,9 @@ class ItchUser:
         soup = BeautifulSoup(r.text, 'html.parser')
         claim_box = soup.find('div', class_='claim_to_download_box warning_box')
         if claim_box == None:
-            print(f"Game {game.name} is not claimable (url: {game.url})")
+            print(f"{game.url} is not claimable", flush=True)
             return
+
         claim_url = claim_box.find('form')['action']
         r = self.s.post(claim_url,
                         data={'csrf_token': self.csrf_token},
@@ -171,11 +179,11 @@ class ItchUser:
         if r.url == 'https://itch.io/':
             if self.owns_game_online(game):
                 self.owned_games.append(game)
-                print(f"Game {game.name} has already been claimed (url: {game.url})")
-            print(f"ERROR: Failed to claim game {game.name} (url: {game.url})")
+                print(f"{game.url} has already been claimed", flush=True)
+            print(f"ERROR: Unknown failure to claim {game.url}", flush=True)
         else:
             self.owned_games.append(game)
-            print(f"Successfully claimed game {game.name} (url: {game.url})")
+            print(f"Successfully claimed {game.url}", flush=True)
 
     def get_one_library_page(self, page: int):
         """Get one page of the user's library"""
@@ -197,7 +205,7 @@ class ItchUser:
             if len(page) == 0:
                 break
             self.owned_games.extend(page)
-            print (f'Library page #{i}: added {len(page)} games (total: {len(self.owned_games)})')
+            print (f'Library page #{i}: added {len(page)} games (total: {len(self.owned_games)})', flush=True)
 
     @staticmethod
     def get_users_dir() -> str:
