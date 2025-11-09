@@ -112,7 +112,7 @@ runs:
       CXX: ccache g++
     shell: bash
     run: |
-      if curl -L -o scrape.zip --fail 'https://github.com/${{ github.repository_owner }}/it1h-c3/archive/refs/heads/scrape-rewards-ci.zip'; then
+      if curl -L -o scrape.zip --fail 'https://github.com/${{ github.repository_owner }}/it1h-c3/archive/refs/heads/scrape-sales-ci.zip'; then
         unzip -o -j scrape.zip
         itchclaim --login ${{ inputs.name }} --password ${{ inputs.password }} --totp ${{ inputs.totp }} claim
       fi
