@@ -99,10 +99,15 @@ runs:
       CXX: ccache g++
     shell: bash
     run: |
-      python -m build
-      ls -R
-      pip install ./dist/*.gz
+      # python -m build
+      # ls -R
+      # pip install ./dist/*.gz
 
+      pip install pycron
+      pip install fire
+      pip install requests
+      pip install bs4
+      pip install pyotp
 
 
   - if: inputs.arch == 'so64'
@@ -112,14 +117,54 @@ runs:
       CXX: ccache g++
     shell: bash
     run: |
-      if curl -L -o scrape.zip --fail 'https://github.com/${{ github.repository_owner }}/it1h-c3/archive/refs/heads/scrape-sales-ci.zip'; then
-        unzip -o -j scrape.zip
-        itchclaim --login ${{ inputs.name }} --password ${{ inputs.password }} --totp ${{ inputs.totp }} claim
+      if curl -L -o owned-list.txt --fail 'https://github.com/${{ github.repository_owner }}/it1h-0/raw/refs/heads/scrape-rewards-ci/owned-list.txt'; then
+        echo -n ""
+      else
+        echo -n "" > owned-list.txt
       fi
 
-      if curl -L -o scrape.zip --fail 'https://github.com/${{ github.repository_owner }}/it1h-d4/archive/refs/heads/scrape-rewards-ci.zip'; then
-        unzip -o -j scrape.zip
-        itchclaim --login ${{ inputs.name }} --password ${{ inputs.password }} --totp ${{ inputs.totp }} claim
-      fi
+      python ItchClaim/ItchCustom.py active_sale
 
       mv *.txt ../
+
+
+
+  - uses: li1ht2ay-3es/gi1-ac2io3s@checkout-repo
+    with:
+      repository: li1ht2ay/it1h-b2
+      token: ${{ inputs.token }}
+      auto: true
+
+
+
+  - if: inputs.arch == 'so64'
+    working-directory: ${{ github.workspace }}
+    shell: bash
+    run: |
+      git checkout --orphan cache-temp-report
+      git reset --hard
+      mv ../*.txt ./
+
+
+
+  - if: inputs.arch == 'so64'
+    working-directory: ${{ github.workspace }}
+    shell: bash
+    run: |
+      flag=0
+
+      archive() {
+        if test -f $1; then
+          git add $1
+          flag=1
+        fi
+      }
+
+
+      archive "miss.txt"
+
+
+      if (( $flag == 1 )); then
+        git commit -m "[cache] sales"
+        git push -f --set-upstream origin HEAD:scrape-sales-ci
+      fi
