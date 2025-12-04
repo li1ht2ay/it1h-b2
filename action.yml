@@ -99,15 +99,8 @@ runs:
       CXX: ccache g++
     shell: bash
     run: |
-      # python -m build
-      # ls -R
-      # pip install ./dist/*.gz
+      pip install -r requirements.txt
 
-      pip install pycron
-      pip install fire
-      pip install requests
-      pip install bs4
-      pip install pyotp
 
 
   - if: inputs.arch == 'so64'
